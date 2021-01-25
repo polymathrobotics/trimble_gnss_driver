@@ -34,8 +34,8 @@ class GsofDriver(object):
         # Get reference coordinates from first epoch if not provided by user
         self.get_message_header()
         self.get_records()
-        ref_x, ref_y, ref_z = self.rec_dict['X_POS'], self.rec_dict['Y_POS'], self.rec_dict['Z_POS']
-        print "# Reference not specified, using first epoch: X =%.4f Y=%.4f Z=%.4f" % (ref_x, ref_y, ref_z)
+        # ref_x, ref_y, ref_z = self.rec_dict['X_POS'], self.rec_dict['Y_POS'], self.rec_dict['Z_POS']
+        # print "# Reference not specified, using first epoch: X =%.4f Y=%.4f Z=%.4f" % (ref_x, ref_y, ref_z)
         print ""
         print "WN - GPS WEEK"
         print "SOW - GPS time"
@@ -49,24 +49,24 @@ class GsofDriver(object):
             # READ GSOF STREAM
             self.get_message_header()
             self.get_records()
-            # PRINT GSOF STREAM
-            x = self.rec_dict['X_POS']
-            y = self.rec_dict['Y_POS']
-            z = self.rec_dict['Z_POS']
-            output = "%04d %.3f %3d %3d %2d %14.4f %14.4f %14.4f %7.4f %7.4f %7.4f" % (
-                self.rec_dict['GPS_WEEK'],
-                self.rec_dict['GPS_TIME']/1000.0,
-                self.rec_dict['FLAG_1'],
-                self.rec_dict['FLAG_2'],
-                self.rec_dict['SVN_NUM'],
-                self.rec_dict['X_POS'],
-                self.rec_dict['Y_POS'],
-                self.rec_dict['Z_POS'],
-                math.sqrt(self.rec_dict['VCV_XX']),
-                math.sqrt(self.rec_dict['VCV_YY']),
-                math.sqrt(self.rec_dict['VCV_ZZ']),
-            )
-            print(output)
+            # # PRINT GSOF STREAM
+            # x = self.rec_dict['X_POS']
+            # y = self.rec_dict['Y_POS']
+            # z = self.rec_dict['Z_POS']
+            # output = "%04d %.3f %3d %3d %2d %14.4f %14.4f %14.4f %7.4f %7.4f %7.4f" % (
+            #     self.rec_dict['GPS_WEEK'],
+            #     self.rec_dict['GPS_TIME']/1000.0,
+            #     self.rec_dict['FLAG_1'],
+            #     self.rec_dict['FLAG_2'],
+            #     self.rec_dict['SVN_NUM'],
+            #     self.rec_dict['X_POS'],
+            #     self.rec_dict['Y_POS'],
+            #     self.rec_dict['Z_POS'],
+            #     math.sqrt(self.rec_dict['VCV_XX']),
+            #     math.sqrt(self.rec_dict['VCV_YY']),
+            #     math.sqrt(self.rec_dict['VCV_ZZ']),
+            # )
+            # print(output)
 
 
 
@@ -112,6 +112,7 @@ class GsofDriver(object):
         msg_field_names = ('STX', 'STATUS', 'TYPE', 'LENGTH',
                            'T_NUM', 'PAGE_INDEX', 'MAX_PAGE_INDEX')
         self.msg_dict = dict(zip(msg_field_names, unpack('>7B', data)))
+        print "msg dict: ", self.msg_dict
         self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
         (checksum, etx) = unpack('>2B', self.client.recv(2))
 
@@ -127,6 +128,7 @@ class GsofDriver(object):
         while len(self.msg_bytes) > 0:
             # READ THE FIRST TWO BYTES FROM RECORD HEADER
             record_type, record_length = unpack('>2B', self.msg_bytes[0:2])
+            print "Record type: ", record_type
             self.msg_bytes = self.msg_bytes[2:]
             self.select_record(record_type, record_length)
 
@@ -154,6 +156,7 @@ class GsofDriver(object):
             rec_values = (math.degrees(rec_values[0]), math.degrees(rec_values[1]), rec_values[2])
             self.rec_dict.update(dict(zip(rec_field_names, rec_values)))
             self.msg_bytes = self.msg_bytes[record_length:]
+            print "rec dict: ", self.rec_dict
         elif record_type == 3:
             rec_field_names = ('X_POS', 'Y_POS', 'Z_POS')
             rec_values = unpack('>3d', self.msg_bytes[0:record_length])
