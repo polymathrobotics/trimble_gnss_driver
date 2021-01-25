@@ -8,37 +8,112 @@ It  has been adapted from https://kb.unavco.org/kb/article/trimble-netr9-receive
 
 
 from struct import unpack
-# from utilities import llh2xyz
-from trimble_gnss_driver.conversions import llh2xyz
+from trimble_gnss_driver.conversions import *
 import socket
 import math
 import argparse
 import rospy
 
-class Gsof(object):
+class GsofDriver(object):
     """ A class to parse GSOF messages from a TCP stream. """
 
-    def __init__(self, sock=None):
-        if sock is None:
-            self.sock = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
-        else:
-            self.sock = sock
+    def __init__(self):
+
+        rospy.init_node('trimble_gnss_driver')
+
+        port = rospy.get_param('~rtk_port', 21098)
+        ip = rospy.get_param('~rtk_ip','192.168.0.50')
+
+        client = self.setup_connection(ip , port)
+
         self.msg_dict = {}
         self.msg_bytes = None
         self.checksum = None
         self.rec_dict = {}
 
-    def connect(self, host, port):
-        self.sock.connect((host, port))
+        # Get reference coordinates from first epoch if not provided by user
+        self.get_message_header()
+        self.get_records()
+        ref_x, ref_y, ref_z = self.rec_dict['X_POS'], self.rec_dict['Y_POS'], self.rec_dict['Z_POS']
+        print "# Reference not specified, using first epoch: X =%.4f Y=%.4f Z=%.4f" % (ref_x, ref_y, ref_z)
+        print ""
+        print "WN - GPS WEEK"
+        print "SOW - GPS time"
+        print "FLAG1 FLAG2" 
+        print "SATS - # SVS"
+        print "X[m] Y[m] Z[m]"
+        print "eX[m] eY[m] eZ[m] - Position VCV Position RMS"
+        print ""
+        print "# WN  SOW     FLAG1 FLAG2 SATS  X[m]          Y[m]            Z[m]       eX[m]   eY[m]     eZ[m]   E[m]   N[m]   U[m]"
+        while 1:
+            # READ GSOF STREAM
+            self.get_message_header()
+            self.get_records()
+            # PRINT GSOF STREAM
+            x = self.rec_dict['X_POS']
+            y = self.rec_dict['Y_POS']
+            z = self.rec_dict['Z_POS']
+            output = "%04d %.3f %3d %3d %2d %14.4f %14.4f %14.4f %7.4f %7.4f %7.4f" % (
+                self.rec_dict['GPS_WEEK'],
+                self.rec_dict['GPS_TIME']/1000.0,
+                self.rec_dict['FLAG_1'],
+                self.rec_dict['FLAG_2'],
+                self.rec_dict['SVN_NUM'],
+                self.rec_dict['X_POS'],
+                self.rec_dict['Y_POS'],
+                self.rec_dict['Z_POS'],
+                math.sqrt(self.rec_dict['VCV_XX']),
+                math.sqrt(self.rec_dict['VCV_YY']),
+                math.sqrt(self.rec_dict['VCV_ZZ']),
+            )
+            print(output)
+
+
+
+    def setup_connection(self, _ip, _port):
+        port = _port
+        ip = None
+        attempts_limit = 10
+        current_attempt = 0
+        connected = False
+
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        while not connected and not rospy.is_shutdown() and current_attempt < attempts_limit:
+            current_attempt += 1
+
+            try:
+                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                client.settimeout(5)
+                ip = socket.gethostbyname(_ip)
+                address = (ip, port)
+
+                rospy.loginfo("Attempting connection to %s:%s ", ip, port)
+                client.connect(address)
+
+                rospy.loginfo("=====================================")
+                rospy.loginfo("Connected to %s:%s ", ip, port)
+                rospy.loginfo("=====================================")
+                connected = True
+            except Exception as e:
+                rospy.logwarn("Connection to IP: " + ip + ": " + e.__str__() +
+                              ".\nRetrying connection: Attempt: %s/%s",
+                              current_attempt, attempts_limit)
+
+        if not connected:
+            rospy.logerr("No connection established. Node shutting down")
+            sys.exit()
+
+        return client
+
 
     def get_message_header(self):
-        data = self.sock.recv(7)
+        data = self.client.recv(7)
         msg_field_names = ('STX', 'STATUS', 'TYPE', 'LENGTH',
                            'T_NUM', 'PAGE_INDEX', 'MAX_PAGE_INDEX')
         self.msg_dict = dict(zip(msg_field_names, unpack('>7B', data)))
-        self.msg_bytes = self.sock.recv(self.msg_dict['LENGTH'] - 3)
-        (checksum, etx) = unpack('>2B', self.sock.recv(2))
+        self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
+        (checksum, etx) = unpack('>2B', self.client.recv(2))
 
         def checksum256(st):
             """Calculate checksum"""
@@ -56,6 +131,16 @@ class Gsof(object):
             self.select_record(record_type, record_length)
 
     def select_record(self, record_type, record_length):
+        """
+            Note: Capital means unsigned
+            B - Char
+            L - long
+            H - Short
+            d - Double
+            i - Int
+            f - Float
+            # - Byte c?
+        """
         if record_type == 1:
             rec_field_names = ('GPS_TIME', 'GPS_WEEK', 'SVN_NUM',
                                'FLAG_1', 'FLAG_2', 'INIT_NUM')
@@ -169,67 +254,9 @@ class Gsof(object):
             self.msg_bytes = self.msg_bytes[record_length:]
 
 
-def main():
-    rospy.init_node('trimble_gnss_driver')
-    parser = argparse.ArgumentParser(prog='getGsofStream', usage='%(prog)s -i IP_ADDRESS -p PORT -r X Y Z ')
-    parser.add_argument('-i', '--IP', action="store", default="69.44.87.212", type=str)
-    parser.add_argument('-p', '--PORT', action="store", default=9999, type=int)
-    parser.add_argument('-r', '--ref', nargs=3, action='append')
-    results = parser.parse_args()
-    # OPEN GSOF STREAM
-    s = Gsof()
-    s.connect(results.IP, results.PORT)
-    try:
-        # Use user provided reference coordinates if given
-        ref_x, ref_y, ref_z = results.ref[0]
-        print "# Reference specified, using X =%.3f Y=%.3f Z=%.3f" % (ref_x, ref_y, ref_z)
-    except:
-        # Get reference coordinates from first epoch if not provided by user
-        s.get_message_header()
-        s.get_records()
-        ref_x, ref_y, ref_z = s.rec_dict['X_POS'], s.rec_dict['Y_POS'], s.rec_dict['Z_POS']
-        print "# Reference not specified, using first epoch: X =%.4f Y=%.4f Z=%.4f" % (ref_x, ref_y, ref_z)
-    print ""
-    print "WN - GPS WEEK"
-    print "SOW - GPS time"
-    print "FLAG1 FLAG2" 
-    print "SATS - # SVS"
-    print "X[m] Y[m] Z[m]"
-    print "eX[m] eY[m] eZ[m] - Position VCV Position RMS"
-    print "E[m] N[m] U[m]"
-    print ""
-    print "# WN  SOW     FLAG1 FLAG2 SATS  X[m]          Y[m]            Z[m]       eX[m]   eY[m]     eZ[m]   E[m]   N[m]   U[m]"
-    while 1:
-        # READ GSOF STREAM
-        s.get_message_header()
-        s.get_records()
-        # PRINT GSOF STREAM
-        x = s.rec_dict['X_POS']
-        y = s.rec_dict['Y_POS']
-        z = s.rec_dict['Z_POS']
-        neu = xyz2neu(ref_x, ref_y, ref_z, x, y, z)
-        output = "%04d %.3f %3d %3d %2d %14.4f %14.4f %14.4f %7.4f %7.4f %7.4f %7.4f %7.4f %7.4f" % (
-            s.rec_dict['GPS_WEEK'],
-            s.rec_dict['GPS_TIME']/1000.0,
-            s.rec_dict['FLAG_1'],
-            s.rec_dict['FLAG_2'],
-            s.rec_dict['SVN_NUM'],
-            s.rec_dict['X_POS'],
-            s.rec_dict['Y_POS'],
-            s.rec_dict['Z_POS'],
-            math.sqrt(s.rec_dict['VCV_XX']),
-            math.sqrt(s.rec_dict['VCV_YY']),
-            math.sqrt(s.rec_dict['VCV_ZZ']),
-            neu[1],
-            neu[0],
-            neu[2],
-        )
-        print(output)
-
 
 if __name__ == '__main__':
     try:
-        main()
-    except KeyboardInterrupt:
-        print "\n#: Stopping, you hit ctl+C. "
-        #traceback.print_exc()
+        GsofDriver()
+    except rospy.ROSInterruptException:
+        pass
