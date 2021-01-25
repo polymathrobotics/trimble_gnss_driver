@@ -24,7 +24,7 @@ class GsofDriver(object):
         port = rospy.get_param('~rtk_port', 21098)
         ip = rospy.get_param('~rtk_ip','192.168.0.50')
 
-        client = self.setup_connection(ip , port)
+        self.client = self.setup_connection(ip , port)
 
         self.msg_dict = {}
         self.msg_bytes = None
