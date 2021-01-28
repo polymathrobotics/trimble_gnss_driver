@@ -14,6 +14,9 @@
     <param name="rtk_port"    value="$(arg rtk_port)" type="int"/>
     <param name="gps_main_frame_id"   value="$(arg gps_main_frame_id)"/>
     <param name="gps_aux_frame_id"    value="$(arg gps_aux_frame_id)"/>
+    <!-- Output remapping -->
+    <remap from="fix"                 to="gps/fix" /> <!-- fix output topic -->
+    <remap from="attitude"                 to="attitude" /> <!-- yaw output topic -->
   </node>
 
 
