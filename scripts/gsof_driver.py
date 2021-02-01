@@ -15,7 +15,6 @@ import sys
 import math
 import rospy
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import NavSatFix, NavSatStatus, Imu # For lat lon h
 from tf.transformations import quaternion_from_euler
@@ -32,7 +31,7 @@ BASE_POSITION_QUALITY = 41 # Needed for gps quality indicator
 INS_FULL_NAV = 49          # INS fused full nav info pose, attittude etc
 INS_RMS = 50               # RMS errors from reported fused position
 
-# Others
+# Others (but still not the entire list of GSOF msgs available.)
 VELOCITY = 8
 SERIAL_NUM = 15
 GPS_TIME = 1
@@ -40,7 +39,7 @@ UTC_TIME = 16
 ECEF_POS = 3
 
 
-class GsofDriver(object):
+class GSOFDriver(object):
     """ A class to parse GSOF messages from a TCP stream. """
 
     def __init__(self):
@@ -54,11 +53,13 @@ class GsofDriver(object):
         self.base_frame = rospy.get_param("base_frame", "base_link")
 
         self.fix_pub = rospy.Publisher('fix', NavSatFix, queue_size=1)
-        # For attitude, use Pose type to avoid confusion that data might be from
-        # IMU only but at the same time keep compatible with robot_localization
-        self.attitude_pub = rospy.Publisher('attitude', PoseWithCovarianceStamped, queue_size=1)
+        # For attitude, use IMU msg to keep compatible with robot_localization
+        # But note that this is not only from an IMU
+        self.attitude_pub = rospy.Publisher('attitude', Imu, queue_size=1)
         # yaw from the dual antennas fills an Imu msg simply to keep consistent
         # with the current setup
+        # Keep separate from attitude to avoid accidentally fusing zeros when
+        # we don't measure roll/pitch
         self.yaw_pub = rospy.Publisher('yaw', Imu, queue_size=1)
 
         self.client = self.setup_connection(ip , port)
@@ -73,6 +74,7 @@ class GsofDriver(object):
         self.pos_sigma_ts = 0
         self.quality_ts = 0
         self.error_info_timeout = 1.0
+        self.base_info_timeout = 5.0
 
         self.gps_qualities = {
             # Unknown
@@ -128,6 +130,9 @@ class GsofDriver(object):
             self.current_time = rospy.get_time()
             self.get_message_header()
             self.get_records()
+
+            # Make sure we have the information required to publish msgs and
+            # that its not too old
             if INS_FULL_NAV in self.records:
                 if INS_RMS in self.records or self.current_time - self.ins_rms_ts < self.error_info_timeout:
                     # print "Full INS info, filling ROS messages"
@@ -137,16 +142,17 @@ class GsofDriver(object):
                     print "Skipping..... current time: ", self.current_time, "ins time: ", self.ins_rms_ts
             else:
                 if LAT_LON_H in self.records:
-                    if (POSITION_SIGMA in self.records or self.current_time - self.pos_sigma_ts < self.error_info_timeout) and (BASE_POSITION_QUALITY in self.records or self.current_time - self.quality_ts < self.error_info_timeout):
+                    if (POSITION_SIGMA in self.records or self.current_time - self.pos_sigma_ts < self.error_info_timeout) and (BASE_POSITION_QUALITY in self.records or self.current_time - self.quality_ts < self.base_info_timeout):
                         self.send_fix()
                 if ATTITUDE in self.records:
                     self.send_yaw()
             if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
-            # if 'FUSED_ALTITUDE' in self.rec_dict and 'HEIGHT_WGS84' in self.rec_dict:
                 print "Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84']
+
 
     def send_ins_fix(self):
         if self.rec_dict['FUSED_LATITUDE'] == 0 and self.rec_dict['FUSED_LONGITUDE']  == 0 and self.rec_dict['FUSED_ALTITUDE'] == 0:
+            rospy.logwarn("Invalid fix, skipping")
             return
         current_time = rospy.get_rostime() # Replace with GPS time?
         fix = NavSatFix()
@@ -177,18 +183,20 @@ class GsofDriver(object):
 
     def send_ins_attitude(self):
         """
-        We send the GNSS fused attitude information as a PoseWithCovarianceStamped
-        msg to avoid confusion that it might come purely from an IMU - while
-        keeping compatible with the robot_localization package.
+        We send the GNSS fused attitude information as an IMU msg to
+        keep compatible with the robot_localization package. Although it should
+        be noted that this is not just from an IMU but fused with dual gnss
+        antennas information.
         """
 
         if self.rec_dict['FUSED_ROLL'] == 0 and self.rec_dict['FUSED_PITCH']  == 0 and self.rec_dict['FUSED_YAW'] == 0:
+            rospy.logwarn("Invalid yaw, skipping")
             return
 
         current_time = rospy.get_rostime() # Replace with GPS time?
 
         # print "current time: ", current_time, "INS time: ", self.ins_rms_ts
-        attitude = PoseWithCovarianceStamped()
+        attitude = Imu()
 
         attitude.header.stamp = current_time
         attitude.header.frame_id = self.base_frame  # Assume transformation handled by receiver
@@ -199,17 +207,18 @@ class GsofDriver(object):
                                              heading_enu)
         # print 'r p y_enu receiver_heading [degs]: ', self.rec_dict['FUSED_ROLL'], self.rec_dict['FUSED_PITCH'], math.degrees(heading_enu), self.rec_dict['FUSED_YAW']
 
-        attitude.pose.pose.orientation = Quaternion(*orientation_quat)
+        attitude.orientation = Quaternion(*orientation_quat)
 
-        attitude.pose.covariance[23] = math.radians(self.rec_dict['FUSED_RMS_ROLL']) ** 2  # [36] size array
-        attitude.pose.covariance[29] = math.radians(self.rec_dict['FUSED_RMS_PITCH']) ** 2  # [36] size array
-        attitude.pose.covariance[35] = math.radians(self.rec_dict['FUSED_RMS_YAW']) ** 2 # [36] size array
+        attitude.orientation_covariance[0] = math.radians(self.rec_dict['FUSED_RMS_ROLL']) ** 2  # [36] size array
+        attitude.orientation_covariance[4] = math.radians(self.rec_dict['FUSED_RMS_PITCH']) ** 2  # [36] size array
+        attitude.orientation_covariance[8] = math.radians(self.rec_dict['FUSED_RMS_YAW']) ** 2 # [36] size array
 
         self.attitude_pub.publish(attitude)
 
 
     def send_fix(self):
         if self.rec_dict['LATITUDE'] == 0 and self.rec_dict['LONGITUDE']  == 0 and self.rec_dict['HEIGHT_WGS84'] == 0:
+            rospy.logwarn("Invalid fix, skipping")
             return
 
         current_time = rospy.get_rostime() # Replace with GPS time?
@@ -245,6 +254,7 @@ class GsofDriver(object):
         other software
         """
         if self.rec_dict['ROLL'] == 0 and self.rec_dict['PITCH']  == 0 and self.rec_dict['YAW'] == 0:
+            rospy.logwarn("Invalid yaw, skipping")
             return
 
         current_time = rospy.get_rostime() # Replace with GPS time?
@@ -332,6 +342,7 @@ class GsofDriver(object):
             self.checksum = True
         else:
             self.checksum = False
+        # print "Checksum: ", self.checksum
 
 
     def get_records(self):
@@ -358,6 +369,6 @@ class GsofDriver(object):
 
 if __name__ == '__main__':
     try:
-        GsofDriver()
+        GSOFDriver()
     except rospy.ROSInterruptException:
         pass
