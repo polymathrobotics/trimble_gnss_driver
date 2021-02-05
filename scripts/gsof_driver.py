@@ -8,7 +8,6 @@ It  has been adapted from https://kb.unavco.org/kb/article/trimble-netr9-receive
 
 
 from struct import unpack
-from trimble_gnss_driver.conversions import *
 from trimble_gnss_driver.parser import parse_maps
 import socket
 import sys
