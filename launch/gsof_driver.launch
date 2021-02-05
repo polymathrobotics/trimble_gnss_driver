@@ -19,8 +19,8 @@
     <param name="base_frame"          value="$(arg base_frame)"/>
     <!-- Output remapping -->
     <remap from="fix"                 to="gps/fix" /> <!-- fix output topic -->
-    <remap from="yaw"                 to="yaw" /> <!-- attitude output topic -->
-    <remap from="attitude"            to="attitude" /> <!-- attitude output topic -->
+    <remap from="yaw"                 to="yaw" /> <!-- yaw output topic if not using INS -->
+    <remap from="attitude"            to="attitude" /> <!-- attitude output topic, includes yaw if using INS -->
   </node>
 
 
