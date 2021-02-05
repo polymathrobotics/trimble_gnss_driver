@@ -9,6 +9,7 @@ It  has been adapted from https://kb.unavco.org/kb/article/trimble-netr9-receive
 
 from struct import unpack
 from trimble_gnss_driver.parser import parse_maps
+from trimble_gnss_driver.gps_qualities import gps_qualities
 import socket
 import sys
 import math
@@ -49,7 +50,7 @@ class GSOFDriver(object):
         ip = rospy.get_param('~rtk_ip','192.168.0.50')
 
         self.gps_main_frame_id = rospy.get_param('~gps_main_frame_id', 'gps_link')
-        self.base_frame = rospy.get_param("base_frame", "base_link")
+        self.base_frame = rospy.get_param("~base_frame", "base_link")
 
         self.fix_pub = rospy.Publisher('fix', NavSatFix, queue_size=1)
         # For attitude, use IMU msg to keep compatible with robot_localization
@@ -75,53 +76,6 @@ class GSOFDriver(object):
         self.error_info_timeout = 1.0
         self.base_info_timeout = 5.0
 
-        self.gps_qualities = {
-            # Unknown
-            -1: [
-                NavSatStatus.STATUS_NO_FIX,
-                NavSatFix.COVARIANCE_TYPE_UNKNOWN
-            ],
-            # Invalid
-            0: [
-                NavSatStatus.STATUS_NO_FIX,
-                NavSatFix.COVARIANCE_TYPE_UNKNOWN
-            ],
-            # SPS
-            1: [
-                NavSatStatus.STATUS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # DGPS
-            2: [
-                NavSatStatus.STATUS_SBAS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # PPS
-            3: [
-                NavSatStatus.STATUS_SBAS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # RTK Fix
-            4: [
-                NavSatStatus.STATUS_GBAS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # RTK Float
-            5: [
-                NavSatStatus.STATUS_GBAS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # Estimated (dead reckoning) mode
-            6: [
-                NavSatStatus.STATUS_NO_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ],
-            # Manual input mode
-            7: [
-                NavSatStatus.STATUS_SBAS_FIX,
-                NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-            ]
-        }
 
         while not rospy.is_shutdown():
             # READ GSOF STREAM
@@ -159,7 +113,7 @@ class GSOFDriver(object):
         fix.header.stamp = current_time
         fix.header.frame_id = self.gps_main_frame_id
 
-        gps_qual = self.gps_qualities[self.rec_dict['GPS_QUALITY']]
+        gps_qual = gps_qualities[self.rec_dict['GPS_QUALITY']]
         fix.status.service = NavSatStatus.SERVICE_GPS # TODO: Fill correctly
         fix.status.status = gps_qual[0]
         fix.position_covariance_type = gps_qual[1]
@@ -226,7 +180,7 @@ class GSOFDriver(object):
         fix.header.stamp = current_time
         fix.header.frame_id = self.gps_main_frame_id
 
-        gps_qual = self.gps_qualities[self.rec_dict['QI']]
+        gps_qual = gps_qualities[self.rec_dict['QI']]
         fix.status.service = NavSatStatus.SERVICE_GPS # TODO: Fill correctly
         fix.status.status = gps_qual[0]
         fix.position_covariance_type = gps_qual[1]
