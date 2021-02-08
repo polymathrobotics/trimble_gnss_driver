@@ -84,6 +84,10 @@ class GSOFDriver(object):
             self.get_message_header()
             self.get_records()
 
+            if not self.checksum:
+                rospy.logwarn("Invalid checksum, skipping")
+                continue
+
             # Make sure we have the information required to publish msgs and
             # that its not too old
             if INS_FULL_NAV in self.records:
