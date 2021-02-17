@@ -104,15 +104,17 @@ class GSOFDriver(object):
                     self.send_ins_fix()
                     self.send_ins_attitude()
                 else:
-                    print "Skipping..... current time: ", self.current_time, "ins time: ", self.ins_rms_ts
+                    rospy.logwarn("Skipping INS output as no matching errors within the timeout. Current time: %f, last error msg %f", self.current_time, self.ins_rms_ts)
             else:
                 if LAT_LON_H in self.records:
                     if (POSITION_SIGMA in self.records or self.current_time - self.pos_sigma_ts < self.error_info_timeout) and (BASE_POSITION_QUALITY in self.records or self.current_time - self.quality_ts < self.base_info_timeout):
                         self.send_fix()
+                    else:
+                        rospy.logwarn("Skipping fix output as no corresponding sigma errors or gps quality within the timeout. Current time: %f, last sigma msg %f, last gps quality msg %f", self.current_time, self.pos_sigma_ts, self.quality_ts)
                 if ATTITUDE in self.records:
                     self.send_yaw()
-            if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
-                print "Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84']
+            # if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
+            #     print "Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84']
 
 
     def send_ins_fix(self):
@@ -236,7 +238,7 @@ class GSOFDriver(object):
         orientation_quat = quaternion_from_euler(self.rec_dict['ROLL'],     #  roll sign stays the same
                                              - self.rec_dict['PITCH'],  # -ve for robots coord system (+ve down)
                                              heading_enu)
-        print 'r p y receiver_heading [rads]: ', self.rec_dict['ROLL'], self.rec_dict['PITCH'], heading_enu, self.rec_dict['YAW']
+        # print 'r p y receiver_heading [rads]: ', self.rec_dict['ROLL'], self.rec_dict['PITCH'], heading_enu, self.rec_dict['YAW']
 
         yaw.orientation = Quaternion(*orientation_quat)
 
