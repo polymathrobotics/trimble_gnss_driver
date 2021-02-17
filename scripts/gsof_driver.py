@@ -18,7 +18,7 @@ import rospy
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import NavSatFix, NavSatStatus, Imu # For lat lon h
 from tf.transformations import quaternion_from_euler
-
+import tf
 
 """
 GSOF messages from https://www.trimble.com/OEM_ReceiverHelp/#GSOFmessages_Overview.html?TocPath=Output%2520Messages%257CGSOF%2520Messages%257COverview%257C_____0
@@ -49,8 +49,16 @@ class GSOFDriver(object):
         port = rospy.get_param('~rtk_port', 21098)
         ip = rospy.get_param('~rtk_ip','192.168.0.50')
 
-        self.gps_main_frame_id = rospy.get_param('~gps_main_frame_id', 'gps_link')
-        self.base_frame = rospy.get_param("~base_frame", "base_link")
+        self.output_frame_id = rospy.get_param("~output_frame_id", "base_link")
+
+        apply_dual_antenna_offset = rospy.get_param("~apply_dual_antenna_offset", False)
+
+        if apply_dual_antenna_offset:
+            gps_main_frame_id = rospy.get_param('~gps_main_frame_id', 'gps_link')
+            gps_aux_frame_id = rospy.get_param('~gps_aux_frame_id', 'gps_link')
+            self.heading_offset = self.get_heading_offset(gps_main_frame_id, gps_aux_frame_id)
+        else:
+            self.heading_offset = 0.0
 
         self.fix_pub = rospy.Publisher('fix', NavSatFix, queue_size=1)
         # For attitude, use IMU msg to keep compatible with robot_localization
@@ -115,7 +123,7 @@ class GSOFDriver(object):
         fix = NavSatFix()
 
         fix.header.stamp = current_time
-        fix.header.frame_id = self.gps_main_frame_id
+        fix.header.frame_id = self.output_frame_id
 
         gps_qual = gps_qualities[self.rec_dict['GPS_QUALITY']]
         fix.status.service = NavSatStatus.SERVICE_GPS # TODO: Fill correctly
@@ -156,7 +164,7 @@ class GSOFDriver(object):
         attitude = Imu()
 
         attitude.header.stamp = current_time
-        attitude.header.frame_id = self.base_frame  # Assume transformation handled by receiver
+        attitude.header.frame_id = self.output_frame_id  # Assume transformation handled by receiver
 
         heading_enu = 2*math.pi - self.normalize_angle(math.radians(self.rec_dict['FUSED_YAW']) + 3*math.pi/2)
         orientation_quat = quaternion_from_euler(math.radians(self.rec_dict['FUSED_ROLL']),     #  roll sign stays the same
@@ -182,7 +190,7 @@ class GSOFDriver(object):
         fix = NavSatFix()
 
         fix.header.stamp = current_time
-        fix.header.frame_id = self.gps_main_frame_id
+        fix.header.frame_id = self.output_frame_id
 
         gps_qual = gps_qualities[self.rec_dict['QI']]
         fix.status.service = NavSatStatus.SERVICE_GPS # TODO: Fill correctly
@@ -220,9 +228,11 @@ class GSOFDriver(object):
         yaw = Imu()
 
         yaw.header.stamp = current_time
-        yaw.header.frame_id = self.base_frame  # Assume transformation handled by receiver
+        yaw.header.frame_id = self.output_frame_id  # Assume transformation handled by receiver
 
-        heading_enu = 2*math.pi - self.normalize_angle(self.rec_dict['YAW'] + 3*math.pi/2)
+        heading_ned = self.normalize_angle(self.rec_dict['YAW'] + self.heading_offset)
+        heading_enu = 2*math.pi - self.normalize_angle(heading_ned + 3*math.pi/2)
+
         orientation_quat = quaternion_from_euler(self.rec_dict['ROLL'],     #  roll sign stays the same
                                              - self.rec_dict['PITCH'],  # -ve for robots coord system (+ve down)
                                              heading_enu)
@@ -244,6 +254,37 @@ class GSOFDriver(object):
         while angle_in < 0:
             angle_in = angle_in + 2*math.pi
         return angle_in
+
+
+    def get_heading_offset(self, gps_main_frame_id, gps_aux_frame_id):
+
+        if gps_main_frame_id == gps_aux_frame_id:
+            rospy.logerr("Cannot offset antenna yaw if they have the same frame_id's, will assume 0.0")
+            return 0.0
+
+        #        Get GPS antenna tf
+        tf_listener = tf.TransformListener()
+
+        rospy.loginfo( "Waiting for GPS tf between antennas.")
+        got_gps_tf = False
+        while not got_gps_tf:
+            try:
+                (trans, rot) = tf_listener.lookupTransform(gps_main_frame_id, gps_aux_frame_id, rospy.Time(0))
+                got_gps_tf = True
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                got_gps_tf = False
+                continue
+
+        rospy.loginfo( "Got gps tf")
+        dy_antennas = trans[1]
+        dx_antennas = trans[0]
+
+        if got_gps_tf:
+            heading_offset = math.atan2(dy_antennas,dx_antennas)
+        else:
+            heading_offset = 0
+
+        return heading_offset
 
 
     def setup_connection(self, _ip, _port):
