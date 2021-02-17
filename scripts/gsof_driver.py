@@ -59,6 +59,7 @@ class GSOFDriver(object):
             self.heading_offset = self.get_heading_offset(gps_main_frame_id, gps_aux_frame_id)
         else:
             self.heading_offset = 0.0
+        rospy.loginfo("Heading offset is %f", self.heading_offset)
 
         self.fix_pub = rospy.Publisher('fix', NavSatFix, queue_size=1)
         # For attitude, use IMU msg to keep compatible with robot_localization
