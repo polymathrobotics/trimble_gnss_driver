@@ -158,20 +158,13 @@ parse_maps = {
     #    ],
     35:[
         ('FLAGS',
-         'BASE_NAME_1',
-         'BASE_NAME_2',
-         'BASE_NAME_3',
-         'BASE_NAME_4',
-         'BASE_NAME_5',
-         'BASE_NAME_6',
-         'BASE_NAME_7',
-         'BASE_NAME_8',
+         'BASE_NAME',
          'BASE_ID_1',
          'BASE_ID_2',
          'BASE_LATITUDE',
          'BASE_LONGITUDE',
          'BASE_HEIGHT'),
-        ('>B8B2B3d')
+        ('>B8s2B3d')
        ],
     37:[
         ('BATT_CAPACITY',

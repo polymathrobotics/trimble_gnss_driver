@@ -14,6 +14,7 @@ import socket
 import sys
 import math
 import rospy
+from functools import reduce
 
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import NavSatFix, NavSatStatus, Imu # For lat lon h
@@ -38,7 +39,8 @@ SERIAL_NUM = 15
 GPS_TIME = 1
 UTC_TIME = 16
 ECEF_POS = 3
-
+LOCAL_DATUM = 4
+LOCAL_ENU= 5
 
 class GSOFDriver(object):
     """ A class to parse GSOF messages from a TCP stream. """
@@ -76,7 +78,7 @@ class GSOFDriver(object):
 
         self.msg_dict = {}
         self.msg_bytes = None
-        self.checksum = None
+        self.checksum = True
         self.rec_dict = {}
 
         self.current_time = rospy.get_time()
@@ -116,8 +118,10 @@ class GSOFDriver(object):
                 if ATTITUDE in self.records:
                     self.send_yaw()
             
-            if RECEIVED_BASE_INFO in self.records:
-                print("Base Info: \n", self.rec_dict['BASE_NAME'], self.rec_dict['BASE_ID'], self.rec_dict['BASE_LATITUDE'], self.rec_dict['BASE_LONGITUDE'], self.rec_dict['BASE_HEIGHT'])
+            if RECEIVED_BASE_INFO in self.records or LOCAL_DATUM in self.records or LOCAL_ENU in self.records:
+                print(self.rec_dict)
+
+                # print("Base Info: \n", self.rec_dict['BASE_NAME_1'], self.rec_dict['BASE_ID_1'], self.rec_dict['BASE_LATITUDE'], self.rec_dict['BASE_LONGITUDE'], self.rec_dict['BASE_HEIGHT'])
             # if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
             #     print("Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84'])
 
@@ -340,13 +344,13 @@ class GSOFDriver(object):
         self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
         (checksum, etx) = unpack('>2B', self.client.recv(2))
 
-        def checksum256(st):
-            """Calculate checksum"""
-            return reduce(lambda x, y: x+y, map(ord, st)) % 256
-        if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
-            self.checksum = True
-        else:
-            self.checksum = False
+        # def checksum256(st):
+        #     """Calculate checksum"""
+        #     return reduce(lambda x, y: x+y, map(ord, st)) % 256
+        # if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
+        #     self.checksum = True
+        # else:
+        #     self.checksum = False
         # print "Checksum: ", self.checksum
 
 
