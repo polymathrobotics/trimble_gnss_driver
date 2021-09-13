@@ -30,6 +30,7 @@ POSITION_SIGMA = 12        # Errors in position
 BASE_POSITION_QUALITY = 41 # Needed for gps quality indicator
 INS_FULL_NAV = 49          # INS fused full nav info pose, attittude etc
 INS_RMS = 50               # RMS errors from reported fused position
+RECEIVED_BASE_INFO = 35    # Received base information
 
 # Others (but still not the entire list of GSOF msgs available.)
 VELOCITY = 8
@@ -114,8 +115,11 @@ class GSOFDriver(object):
                         rospy.logwarn("Skipping fix output as no corresponding sigma errors or gps quality within the timeout. Current time: %f, last sigma msg %f, last gps quality msg %f", self.current_time, self.pos_sigma_ts, self.quality_ts)
                 if ATTITUDE in self.records:
                     self.send_yaw()
+            
+            if RECEIVED_BASE_INFO in self.records:
+                print("Base Info: \n", self.rec_dict['BASE_NAME'], self.rec_dict['BASE_ID'], self.rec_dict['BASE_LATITUDE'], self.rec_dict['BASE_LONGITUDE'], self.rec_dict['BASE_HEIGHT'])
             # if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
-            #     print "Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84']
+            #     print("Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84'])
 
 
     def send_ins_fix(self):
