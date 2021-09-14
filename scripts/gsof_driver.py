@@ -30,6 +30,7 @@ POSITION_SIGMA = 12        # Errors in position
 BASE_POSITION_QUALITY = 41 # Needed for gps quality indicator
 INS_FULL_NAV = 49          # INS fused full nav info pose, attittude etc
 INS_RMS = 50               # RMS errors from reported fused position
+RECEIVED_BASE_INFO = 35    # Received base information
 
 # Others (but still not the entire list of GSOF msgs available.)
 VELOCITY = 8
@@ -37,7 +38,8 @@ SERIAL_NUM = 15
 GPS_TIME = 1
 UTC_TIME = 16
 ECEF_POS = 3
-
+LOCAL_DATUM = 4
+LOCAL_ENU= 5
 
 class GSOFDriver(object):
     """ A class to parse GSOF messages from a TCP stream. """
@@ -75,7 +77,7 @@ class GSOFDriver(object):
 
         self.msg_dict = {}
         self.msg_bytes = None
-        self.checksum = None
+        self.checksum = True
         self.rec_dict = {}
 
         self.current_time = rospy.get_time()
@@ -114,8 +116,13 @@ class GSOFDriver(object):
                         rospy.logwarn("Skipping fix output as no corresponding sigma errors or gps quality within the timeout. Current time: %f, last sigma msg %f, last gps quality msg %f", self.current_time, self.pos_sigma_ts, self.quality_ts)
                 if ATTITUDE in self.records:
                     self.send_yaw()
+            
+            # if RECEIVED_BASE_INFO in self.records or LOCAL_DATUM in self.records or LOCAL_ENU in self.records:
+            #     print(self.rec_dict)
+
+                # print("Base Info: \n", self.rec_dict['BASE_NAME_1'], self.rec_dict['BASE_ID_1'], self.rec_dict['BASE_LATITUDE'], self.rec_dict['BASE_LONGITUDE'], self.rec_dict['BASE_HEIGHT'])
             # if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
-            #     print "Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84']
+            #     print("Altitude INS: ", self.rec_dict['FUSED_ALTITUDE'], "Height LLH (WGS84): ", self.rec_dict['HEIGHT_WGS84'])
 
 
     def send_ins_fix(self):
@@ -336,14 +343,19 @@ class GSOFDriver(object):
         self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
         (checksum, etx) = unpack('>2B', self.client.recv(2))
 
-        def checksum256(st):
-            """Calculate checksum"""
-            return reduce(lambda x, y: x+y, map(ord, st)) % 256
-        if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
+        if checksum-self.checksum256(self.msg_bytes+data[1:]) == 0:
             self.checksum = True
         else:
             self.checksum = False
-        # print "Checksum: ", self.checksum
+        # print("Checksum: ", self.checksum)
+
+
+    def checksum256(self, st):
+        """Calculate checksum"""
+        if sys.version_info[0] >= 3:
+            return sum(st) % 256
+        else:
+            return reduce(lambda x, y: x+y, map(ord, st)) % 256
 
 
     def get_records(self):

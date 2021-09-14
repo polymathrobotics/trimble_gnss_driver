@@ -142,7 +142,7 @@ parse_maps = {
         'MASTER_SLAVE_RANGE_VAR'),
         ('>L4B4dH7f')
        ],
-    # 34 needs to be dealth with carefully/differently as it depends on the number of
+    # 34 needs to be dealt with carefully/differently as it depends on the number of
     # satellites in view.
     # 34:[
     #     ('PRN',
@@ -156,6 +156,16 @@ parse_maps = {
     #      'SNR_L5'),
     #     ('>5Bh3B')
     #    ],
+    35:[
+        ('FLAGS',
+         'BASE_NAME',
+         'BASE_ID_1',
+         'BASE_ID_2',
+         'BASE_LATITUDE',
+         'BASE_LONGITUDE',
+         'BASE_HEIGHT'),
+        ('>B8s2B3d')
+       ],
     37:[
         ('BATT_CAPACITY',
          'REMAINING_MEM'),
@@ -167,7 +177,7 @@ parse_maps = {
          'LAT_REF',
          'LONG_REF',
          'HEIGHT_REF',
-          'QI'),
+         'QI'),
         ('>LH3dB')
        ],
     49:[
