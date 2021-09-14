@@ -117,8 +117,8 @@ class GSOFDriver(object):
                 if ATTITUDE in self.records:
                     self.send_yaw()
             
-            if RECEIVED_BASE_INFO in self.records or LOCAL_DATUM in self.records or LOCAL_ENU in self.records:
-                print(self.rec_dict)
+            # if RECEIVED_BASE_INFO in self.records or LOCAL_DATUM in self.records or LOCAL_ENU in self.records:
+            #     print(self.rec_dict)
 
                 # print("Base Info: \n", self.rec_dict['BASE_NAME_1'], self.rec_dict['BASE_ID_1'], self.rec_dict['BASE_LATITUDE'], self.rec_dict['BASE_LONGITUDE'], self.rec_dict['BASE_HEIGHT'])
             # if INS_FULL_NAV in self.records and LAT_LON_H in self.records:
@@ -342,14 +342,20 @@ class GSOFDriver(object):
         # print "msg dict: ", self.msg_dict
         self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
         (checksum, etx) = unpack('>2B', self.client.recv(2))
-        def checksum256(st):
-            """Calculate checksum"""
-            return sum(st) % 256
-        if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
+
+        if checksum-self.checksum256(self.msg_bytes+data[1:]) == 0:
             self.checksum = True
         else:
             self.checksum = False
         # print("Checksum: ", self.checksum)
+
+
+    def checksum256(self, st):
+        """Calculate checksum"""
+        if sys.version_info[0] >= 3:
+            return sum(st) % 256
+        else:
+            return reduce(lambda x, y: x+y, map(ord, st)) % 256
 
 
     def get_records(self):
