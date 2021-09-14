@@ -14,7 +14,6 @@ import socket
 import sys
 import math
 import rospy
-from functools import reduce
 
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import NavSatFix, NavSatStatus, Imu # For lat lon h
@@ -343,15 +342,14 @@ class GSOFDriver(object):
         # print "msg dict: ", self.msg_dict
         self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
         (checksum, etx) = unpack('>2B', self.client.recv(2))
-
-        # def checksum256(st):
-        #     """Calculate checksum"""
-        #     return reduce(lambda x, y: x+y, map(ord, st)) % 256
-        # if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
-        #     self.checksum = True
-        # else:
-        #     self.checksum = False
-        # print "Checksum: ", self.checksum
+        def checksum256(st):
+            """Calculate checksum"""
+            return sum(st) % 256
+        if checksum-checksum256(self.msg_bytes+data[1:]) == 0:
+            self.checksum = True
+        else:
+            self.checksum = False
+        # print("Checksum: ", self.checksum)
 
 
     def get_records(self):
