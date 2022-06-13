@@ -12,7 +12,7 @@ jobs:
   ci:
     uses: SAGARobotics/SagaWorkflows/.github/workflows/ci.yml@v3.2
     with:
-      runs-on: 'ubuntu-latest'
+      runs-on: '["ubuntu-latest"]'
       release: 'false'
       disable-checks: 'true'
     secrets:
