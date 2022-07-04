@@ -3,11 +3,11 @@ project(trimble_gnss_driver)
 
 
 find_package(catkin REQUIRED COMPONENTS
-  message_generation
   rospy
-  std_msgs
   geometry_msgs
   nav_msgs
+  sensor_msgs
+  tf
 )
 
 
@@ -15,7 +15,7 @@ catkin_python_setup()
 
 
 catkin_package(
-  CATKIN_DEPENDS message_runtime
+#  CATKIN_DEPENDS message_runtime
 )
 
 
