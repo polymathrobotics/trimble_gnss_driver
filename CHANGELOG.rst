@@ -2,8 +2,8 @@
 Changelog for package trimble_gnss_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.1 (2022-07-04)
+------------------
 * remove unused deps
 * remove unused deps
 * Merge pull request `#3 <https://github.com/MikHut/trimble_gnss_driver/issues/3>`_ from SAGARobotics/Add-launch-file-to-cmakelists
