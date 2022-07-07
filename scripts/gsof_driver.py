@@ -151,8 +151,8 @@ class GSOFDriver(object):
 
         fix.altitude = self.rec_dict['FUSED_ALTITUDE']  # <-- CHECK
 
-        fix.position_covariance[0] = self.rec_dict['FUSED_RMS_LATITUDE'] ** 2
-        fix.position_covariance[4] = self.rec_dict['FUSED_RMS_LONGITUDE'] ** 2
+        fix.position_covariance[0] = self.rec_dict['FUSED_RMS_LONGITUDE'] ** 2
+        fix.position_covariance[4] = self.rec_dict['FUSED_RMS_LATITUDE'] ** 2
         fix.position_covariance[8] = self.rec_dict['FUSED_RMS_ALTITUDE'] ** 2
 
         self.fix_pub.publish(fix)
