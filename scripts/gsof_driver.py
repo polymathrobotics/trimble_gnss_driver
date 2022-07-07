@@ -8,6 +8,7 @@ It  has been adapted from https://kb.unavco.org/kb/article/trimble-netr9-receive
 
 
 from struct import unpack
+from turtle import position
 from trimble_gnss_driver.parser import parse_maps
 from trimble_gnss_driver.gps_qualities import gps_qualities
 import socket
@@ -27,6 +28,7 @@ GSOF messages from https://www.trimble.com/OEM_ReceiverHelp/#GSOFmessages_Overvi
 ATTITUDE = 27              # Attitude information with errors
 LAT_LON_H = 2              # Position lat lon h
 POSITION_SIGMA = 12        # Errors in position
+POSITION_TYPE = 38
 BASE_POSITION_QUALITY = 41 # Needed for gps quality indicator
 INS_FULL_NAV = 49          # INS fused full nav info pose, attittude etc
 INS_RMS = 50               # RMS errors from reported fused position
@@ -110,7 +112,7 @@ class GSOFDriver(object):
                     rospy.logwarn("Skipping INS output as no matching errors within the timeout. Current time: %f, last error msg %f", self.current_time, self.ins_rms_ts)
             else:
                 if LAT_LON_H in self.records:
-                    if (POSITION_SIGMA in self.records or self.current_time - self.pos_sigma_ts < self.error_info_timeout) and (BASE_POSITION_QUALITY in self.records or self.current_time - self.quality_ts < self.base_info_timeout):
+                    if (POSITION_SIGMA in self.records or self.current_time - self.pos_sigma_ts < self.error_info_timeout) and (POSITION_TYPE in self.records or self.current_time - self.quality_ts < self.base_info_timeout):
                         self.send_fix()
                     else:
                         rospy.logwarn("Skipping fix output as no corresponding sigma errors or gps quality within the timeout. Current time: %f, last sigma msg %f, last gps quality msg %f", self.current_time, self.pos_sigma_ts, self.quality_ts)
@@ -201,8 +203,7 @@ class GSOFDriver(object):
 
         fix.header.stamp = current_time
         fix.header.frame_id = self.output_frame_id
-
-        gps_qual = gps_qualities[self.rec_dict['QI']]
+        gps_qual = self.get_gps_quality()
         fix.status.service = NavSatStatus.SERVICE_GPS # TODO: Fill correctly
         fix.status.status = gps_qual[0]
         fix.position_covariance_type = gps_qual[1]
@@ -255,6 +256,23 @@ class GSOFDriver(object):
         yaw.orientation_covariance[8] = self.rec_dict['YAW_VAR'] ** 2 # [36] size array
 
         self.yaw_pub.publish(yaw)
+
+
+    def get_gps_quality(self):
+        """Get ROS NavSatStatus position type from trimbles
+        """
+        trimble_position_type = self.rec_dict['POSITION_TYPE']
+
+        if trimble_position_type >= 9:
+            position_type = 4 # fix
+        elif trimble_position_type >= 7:
+            position_type = 5 # float
+        elif trimble_position_type >= 1:
+            position_type = 2
+        else:
+            position_type = 0
+
+        return gps_qualities[position_type]
 
 
     @staticmethod
@@ -377,7 +395,7 @@ class GSOFDriver(object):
             self.ins_rms_ts = self.current_time
         if POSITION_SIGMA in self.records:
             self.pos_sigma_ts = self.current_time
-        if BASE_POSITION_QUALITY in self.records:
+        if POSITION_TYPE in self.records:
             self.quality_ts = self.current_time
 
 if __name__ == '__main__':

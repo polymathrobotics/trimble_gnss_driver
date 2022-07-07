@@ -29,13 +29,13 @@
   <arg name="gps_aux_frame_id"    default="gps_aux"/>
 
 
-
   <node name="gsof_driver" pkg="trimble_gnss_driver" type="gsof_driver.py" output="screen" respawn="true">
     <param name="rtk_ip"              value="$(arg rtk_ip)"   type="string"/>
     <param name="rtk_port"            value="$(arg rtk_port)" type="int"/>
     <param name="gps_main_frame_id"   value="$(arg gps_main_frame_id)"/>
     <param name="gps_aux_frame_id"    value="$(arg gps_aux_frame_id)"/>
     <param name="output_frame_id"          value="$(arg output_frame_id)"/>
+    <param name="apply_dual_antenna_offset" value="$(arg apply_dual_antenna_offset)"/>
     <!-- Output remapping -->
     <remap from="fix"                 to="gps/fix" /> <!-- fix output topic -->
     <remap from="yaw"                 to="yaw" /> <!-- yaw output topic if not using INS -->

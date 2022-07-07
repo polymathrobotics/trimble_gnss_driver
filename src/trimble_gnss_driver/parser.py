@@ -171,6 +171,22 @@ parse_maps = {
          'REMAINING_MEM'),
         ('>hd')
        ],
+    38:[
+        ('OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'OTHER',
+         'POSITION_TYPE'),
+        ('>L2Bf3BHBLBfB')
+       ],
     41:[
         ('GPS_TIME_REF',
          'GPS_WEEK_REF',
