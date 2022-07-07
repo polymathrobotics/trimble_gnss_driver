@@ -2,8 +2,8 @@
 Changelog for package trimble_gnss_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.3 (2022-07-07)
+------------------
 * Merge branch 'master' of https://github.com/SAGARobotics/trimble_gnss_driver
 * Position covariance reorder to be ENU
 * Contributors: MikHut
