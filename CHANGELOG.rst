@@ -2,6 +2,11 @@
 Changelog for package trimble_gnss_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.0.2 (2022-07-07)
+------------------
+* get position type from receiver msg 38
+* Contributors: MikHut
+
 0.0.1 (2022-07-04)
 ------------------
 * remove unused deps
