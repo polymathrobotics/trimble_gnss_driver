@@ -2,6 +2,12 @@
 Changelog for package trimble_gnss_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge branch 'master' of https://github.com/SAGARobotics/trimble_gnss_driver
+* Position covariance reorder to be ENU
+* Contributors: MikHut
+
 0.0.2 (2022-07-07)
 ------------------
 * get position type from receiver msg 38
