@@ -117,7 +117,7 @@ class GSOFDriver(object):
                         rospy.logwarn("Skipping fix output as no corresponding sigma errors or gps quality within the timeout. Current time: %f, last sigma msg %f, last gps quality msg %f", self.current_time, self.pos_sigma_ts, self.quality_ts)
                 if ATTITUDE in self.records:
                     self.send_yaw()
-            
+
             # if RECEIVED_BASE_INFO in self.records or LOCAL_DATUM in self.records or LOCAL_ENU in self.records:
             #     print(self.rec_dict)
 
@@ -350,15 +350,31 @@ class GSOFDriver(object):
 
         return client
 
+    def read_from_client(self, num_bytes):
+        num_read_bytes = 0
+        read_bytes = b''
+        while num_read_bytes != num_bytes and not rospy.is_shutdown():
+            if num_read_bytes:
+                rospy.logwarn_throttle(10, "Significant network latency detected. Enable DEBUG for more details.")
+                rospy.logdebug(f"Only received %s/%s bytes.",
+                              num_read_bytes, num_bytes)
+            try:
+                new_bytes = self.client.recv(num_bytes-num_read_bytes)
+            except socket.timeout as timeout:
+                rospy.logwarn("Socket timed out during read: %s", timeout)
+                continue
+            read_bytes += new_bytes
+            num_read_bytes += len(new_bytes)
+        return read_bytes
 
     def get_message_header(self):
-        data = self.client.recv(7)
+        data = self.read_from_client(7)
         msg_field_names = ('STX', 'STATUS', 'TYPE', 'LENGTH',
                            'T_NUM', 'PAGE_INDEX', 'MAX_PAGE_INDEX')
         self.msg_dict = dict(zip(msg_field_names, unpack('>7B', data)))
         # print "msg dict: ", self.msg_dict
-        self.msg_bytes = self.client.recv(self.msg_dict['LENGTH'] - 3)
-        (checksum, etx) = unpack('>2B', self.client.recv(2))
+        self.msg_bytes = self.read_from_client(self.msg_dict['LENGTH'] - 3)
+        (checksum, etx) = unpack('>2B', self.read_from_client(2))
 
         if checksum-self.checksum256(self.msg_bytes+data[1:]) == 0:
             self.checksum = True
