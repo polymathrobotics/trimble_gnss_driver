@@ -16,6 +16,7 @@
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>tf</depend>
+  <depend>python-is-python3</depend>
 
   <export>
 
